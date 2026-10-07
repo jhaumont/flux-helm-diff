@@ -1,0 +1,48 @@
+# Try it on a test cluster:
+#   flux create source helm podinfo --url=https://stefanprodan.github.io/podinfo -n default
+#   kubectl apply -f examples/podinfo/release.yaml       # deploys revision 1
+#   (edit replicaCount / image tag / the ConfigMap below)
+#   flux helm-diff upgrade -f examples/podinfo/ -n default
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: podinfo-values
+  namespace: default
+data:
+  values.yaml: |
+    ui:
+      message: "Hello from valuesFrom"
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: podinfo
+  namespace: default
+spec:
+  interval: 10m
+  chart:
+    spec:
+      chart: podinfo
+      version: "6.x"
+      sourceRef:
+        kind: HelmRepository
+        name: podinfo
+  valuesFrom:
+    - kind: ConfigMap
+      name: podinfo-values
+  values:
+    replicaCount: 2
+  commonMetadata:
+    labels:
+      team: platform
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              kind: Deployment
+              name: podinfo
+            patch: |
+              - op: add
+                path: /metadata/annotations/example.com~1patched
+                value: "true"
